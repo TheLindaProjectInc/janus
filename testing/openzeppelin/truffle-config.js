@@ -14,19 +14,19 @@ module.exports = {
       host: "127.0.0.1",
       port: 23889, //Switch to 23888 for local HTTP Server, look at Makefile run-janus
       network_id: "*",
-      gasPrice: "0x64",
+      gasPrice: "0x1388",
     },
     testing: {
       host: "127.0.0.1",
       port: 23888,
       network_id: "*",
-      gasPrice: "0x64",
+      gasPrice: "0x1388",
     },
     docker: {
       host: "janus",
       port: 23889,
       network_id: "*",
-      gasPrice: "0x64",
+      gasPrice: "0x1388",
     },
     ganache: {
       host: "127.0.0.1",
@@ -38,7 +38,7 @@ module.exports = {
       port: 23889,
       network_id: "*",
       from: "0x7926223070547d2d15b2ef5e7383e541c338ffe9",
-      gasPrice: "0x64",
+      gasPrice: "0x1388",
     },
   },
   compilers: {
