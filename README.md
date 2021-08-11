@@ -53,8 +53,8 @@ $ make docker-configure-https && make run-janus-https
 Which will run the most current local version of Janus on port 23888, but without rebuilding the image or the local docker container.
 
 Note that Janus will use the hex address for the test base58 Metrix addresses that belong the the local metrix node, for example:
-  - qUbxboqjBRp96j3La8D1RYkyqx5uQbJPoW (hex 0x7926223070547d2d15b2ef5e7383e541c338ffe9 )
-  - qLn9vqbr2Gx3TsVR9QyTVB5mrMoh4x43Uf (hex 0x2352be3db3177f0a07efbe6da5857615b8c9901d )
+  - mZ1SSGGtAav5b5rCgf4x5SphNLLv6EVtMT (hex 0xb89a4201258da334e3cd6d49047715fbf8a0e386 )
+  - meRTSNhCRNDmdNkvMumNVvEiZAresrzVbV (hex 0xf3fdb4c8636a0fc4a6b00922b5c646650821deab )
 
 ### SSL
 SSL keys and certificates go inside the https folder (mounted at `/https` in the container) and use `--https-key` and `--https-cert` parameters. If the specified files do not exist, it will fall back to http.

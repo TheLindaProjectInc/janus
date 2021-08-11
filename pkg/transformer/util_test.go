@@ -94,42 +94,42 @@ func TestAddressesConversion(t *testing.T) {
 		{
 			metrixChain:   metrix.ChainTest,
 			ethAddress:  "6c89a1a6ca2ae7c00b248bb2832d6f480f27da68",
-			metrixAddress: "qTTH1Yr2eKCuDLqfxUyBLCAjmomQ8pyrBt",
+			metrixAddress: "mS5FATs9YWa931SoiHdzUwSsUmBy28nHrr",
 		},
 
 		// Test cases for addresses defined here:
-		// 	- https://github.com/hayeah/openzeppelin-solidity/blob/metrixcoin/METRIX-NOTES.md#create-test-accounts
+		// 	- https://github.com/hayeah/openzeppelin-solidity/blob/qtum/METRIX-NOTES.md#create-test-accounts
 		//
 		// NOTE: Ethereum addresses are without `0x` prefix, as it expects by conversion functions
 		{
 			metrixChain:   metrix.ChainTest,
-			ethAddress:  "7926223070547d2d15b2ef5e7383e541c338ffe9",
-			metrixAddress: "qUbxboqjBRp96j3La8D1RYkyqx5uQbJPoW",
+			ethAddress:  "b89a4201258da334e3cd6d49047715fbf8a0e386",
+			metrixAddress: "mZ1SSGGtAav5b5rCgf4x5SphNLLv6EVtMT",
 		},
 		{
 			metrixChain:   metrix.ChainTest,
-			ethAddress:  "2352be3db3177f0a07efbe6da5857615b8c9901d",
-			metrixAddress: "qLn9vqbr2Gx3TsVR9QyTVB5mrMoh4x43Uf",
+			ethAddress:  "f3fdb4c8636a0fc4a6b00922b5c646650821deab",
+			metrixAddress: "meRTSNhCRNDmdNkvMumNVvEiZAresrzVbV",
 		},
 		{
 			metrixChain:   metrix.ChainTest,
-			ethAddress:  "69b004ac2b3993bf2fdf56b02746a1f57997420d",
-			metrixAddress: "qTCCy8qy7pW94EApdoBjYc1vQ2w68UnXPi",
+			ethAddress:  "4f9fd8b40f145cbd2ada7e8fcd81034e3f77d05d",
+			metrixAddress: "mPSNBRriZPyKRXPwXDPovGtx9pgFm4Erjs",
 		},
 		{
 			metrixChain:   metrix.ChainTest,
-			ethAddress:  "8c647515f03daeefd09872d7530fa8d8450f069a",
-			metrixAddress: "qWMi6ne9mDQFatRGejxdDYVUV9rQVkAFGp",
+			ethAddress:  "965a1bf254099bff1467e4020781e0dafe073810",
+			metrixAddress: "mVtLccbttd4vCZCrf7gKCyZoeZWDjQvrS7",
 		},
 		{
 			metrixChain:   metrix.ChainTest,
-			ethAddress:  "2191744eb5ebeac90e523a817b77a83a0058003b",
-			metrixAddress: "qLcshhsRS6HKeTKRYFdpXnGVZxw96QQcfm",
+			ethAddress:  "43fe2890bb0acaa1f8a56674e43d618ce425e516",
+			metrixAddress: "mNNs437u1qc6DVUbeGGpY7HsJPDRB8JuB4",
 		},
 		{
 			metrixChain:   metrix.ChainTest,
-			ethAddress:  "88b0bf4b301c21f8a47be2188bad6467ad556dcf",
-			metrixAddress: "qW28njWueNpBXYWj2KDmtFG2gbLeALeHfV",
+			ethAddress:  "43f7324ad7e65e30f6ac9e2c00c2f020c0f53dc0",
+			metrixAddress: "mNNiiJsBnPUZu4NwNtPaK9zyxD5ghV1By8",
 		},
 	}
 
