@@ -34,10 +34,10 @@ module.exports = {
       network_id: "*",
     },
     testnet: {
-      host: "hk1.s.metrix.org",
+      host: "206.189.117.117",
       port: 23889,
       network_id: "*",
-      from: "0x7926223070547d2d15b2ef5e7383e541c338ffe9",
+      from: "0xb89a4201258da334e3cd6d49047715fbf8a0e386",
       gasPrice: "0x1388",
     },
   },
