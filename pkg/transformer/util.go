@@ -20,7 +20,7 @@ import (
 
 var ZeroSatoshi = decimal.NewFromInt(0)
 var OneSatoshi = decimal.NewFromFloat(0.00000001)
-var MinimumGas = decimal.NewFromFloat(0.0000004)
+var MinimumGas = decimal.NewFromFloat(0.00005000)
 
 type EthGas interface {
 	GasHex() string
