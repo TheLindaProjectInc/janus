@@ -1,0 +1,42 @@
+  
+version: "3.3"
+
+networks:
+  metrix-mainnet-network:
+volumes:
+  metrixd-mainnet-volume:
+
+services:
+  janus_mainnet:
+    image: metrixcoin/janus
+    container_name: janus_mainnet
+    build: 
+        context: ../../
+        cache_from:
+          - golang:1.14-alpine
+    ports:
+        - "23890:23890"
+    environment: 
+        - METRIX_RPC=http://metrix:testpasswd@metrix_mainnet:33831
+        - COMPOSE_PROJECT_NAME=mainnet
+    volumes:
+        - ../standalone/myaccounts.txt:$GOPATH/github.com/TheLindaProjectInc/janus/myaccounts.txt
+        - ../../https:/https
+    depends_on:
+      - metrix_mainnet
+    command: --bind 0.0.0.0 --port 23890 --ignoreTransactions --accounts $GOPATH/github.com/TheLindaProjectInc/janus/myaccounts.txt --dev --https-key /https/key.pem --https-cert /https/cert.pem
+    networks:
+      - metrix-mainnet-network
+
+  metrix_mainnet:
+    ports:
+      - "33831:33831"
+    image: metrixcoin/metrix
+    container_name: metrix_mainnet
+    environment: 
+        - COMPOSE_PROJECT_NAME=mainnet
+    command: metrixd  -txindex -addrindex=1 -rpcbind=0.0.0.0:33831 -rpcallowip=0.0.0.0/0 -rpcuser=metrix -rpcpassword=testpasswd -deprecatedrpc=accounts 
+    volumes:
+      - metrixd-volume-mainnet
+    networks:
+      - metrix-mainnet-network

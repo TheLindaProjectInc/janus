@@ -1,0 +1,240 @@
+package transformer
+
+import (
+	"encoding/json"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/labstack/echo"
+	"github.com/pkg/errors"
+	"github.com/TheLindaProjectInc/janus/pkg/eth"
+	"github.com/TheLindaProjectInc/janus/pkg/metrix"
+	"github.com/TheLindaProjectInc/janus/pkg/utils"
+)
+
+// ProxyETHGetTransactionByHash implements ETHProxy
+type ProxyETHGetTransactionByHash struct {
+	*metrix.Metrix
+}
+
+func (p *ProxyETHGetTransactionByHash) Method() string {
+	return "eth_getTransactionByHash"
+}
+
+func (p *ProxyETHGetTransactionByHash) Request(req *eth.JSONRPCRequest, c echo.Context) (interface{}, error) {
+	var txHash eth.GetTransactionByHashRequest
+	if err := json.Unmarshal(req.Params, &txHash); err != nil {
+		return nil, errors.Wrap(err, "couldn't unmarshal request")
+	}
+	if txHash == "" {
+		return nil, errors.New("transaction hash is empty")
+	}
+
+	metrixReq := &metrix.GetTransactionRequest{
+		TxID: utils.RemoveHexPrefix(string(txHash)),
+	}
+	return p.request(metrixReq)
+}
+
+func (p *ProxyETHGetTransactionByHash) request(req *metrix.GetTransactionRequest) (*eth.GetTransactionByHashResponse, error) {
+	ethTx, err := getTransactionByHash(p.Metrix, req.TxID)
+	if err != nil {
+		return nil, err
+	}
+	return ethTx, nil
+}
+
+// TODO: think of returning flag if it's a reward transaction for miner
+func getTransactionByHash(p *metrix.Metrix, hash string) (*eth.GetTransactionByHashResponse, error) {
+	metrixTx, err := p.GetTransaction(hash)
+	if err != nil {
+		if errors.Cause(err) != metrix.ErrInvalidAddress {
+			return nil, err
+		}
+		ethTx, err := getRewardTransactionByHash(p, hash)
+		if err != nil {
+			if errors.Cause(err) == metrix.ErrInvalidAddress {
+				return nil, nil
+			}
+			rawTx, err := p.GetRawTransaction(hash, false)
+			if err != nil {
+				if errors.Cause(err) == metrix.ErrInvalidAddress {
+					return nil, nil
+				}
+				return nil, err
+			} else {
+				metrixTx = &metrix.GetTransactionResponse{
+					BlockHash:  rawTx.BlockHash,
+					BlockIndex: 1, // TODO: Possible to get this somewhere?
+					Hex:        rawTx.Hex,
+				}
+			}
+		}
+		return ethTx, nil
+	}
+	metrixDecodedRawTx, err := p.DecodeRawTransaction(metrixTx.Hex)
+	if err != nil {
+		return nil, errors.WithMessage(err, "couldn't get raw transaction")
+	}
+
+	ethTx := &eth.GetTransactionByHashResponse{
+		Hash:  utils.AddHexPrefix(metrixDecodedRawTx.ID),
+		Nonce: "0x0",
+
+		// TODO: researching
+		// ? Do we need those values
+		V: "",
+		R: "",
+		S: "",
+	}
+
+	if !metrixTx.IsPending() { // otherwise, the following values must be nulls
+		blockNumber, err := getBlockNumberByHash(p, metrixTx.BlockHash)
+		if err != nil {
+			return nil, errors.WithMessage(err, "couldn't get block number by hash")
+		}
+		ethTx.BlockNumber = hexutil.EncodeUint64(blockNumber)
+		ethTx.BlockHash = utils.AddHexPrefix(metrixTx.BlockHash)
+		ethTx.TransactionIndex = hexutil.EncodeUint64(uint64(metrixTx.BlockIndex))
+	}
+
+	ethAmount, err := formatMetrixAmount(metrixDecodedRawTx.CalcAmount())
+	if err != nil {
+		return nil, errors.WithMessage(err, "couldn't format amount")
+	}
+	ethTx.Value = ethAmount
+
+	metrixTxContractInfo, isContractTx, err := metrixDecodedRawTx.ExtractContractInfo()
+	if err != nil {
+		return nil, errors.WithMessage(err, "couldn't extract contract info")
+	}
+	if isContractTx {
+		// TODO: research is this allowed? ethTx.Input = utils.AddHexPrefix(metrixTxContractInfo.UserInput)
+		if metrixTxContractInfo.UserInput == "" {
+			ethTx.Input = "0x0"
+		} else {
+			ethTx.Input = utils.AddHexPrefix(metrixTxContractInfo.UserInput)
+		}
+		ethTx.From = utils.AddHexPrefix(metrixTxContractInfo.From)
+		//TODO: research if 'To' adress could be other than zero address when 'isContractTx == TRUE'
+		if len(metrixTxContractInfo.To) == 0 {
+			ethTx.To = utils.AddHexPrefix(metrix.ZeroAddress)
+
+		} else {
+			ethTx.To = utils.AddHexPrefix(metrixTxContractInfo.To)
+
+		}
+		ethTx.Gas = hexutil.Encode([]byte(metrixTxContractInfo.GasLimit))
+		ethTx.GasPrice = hexutil.Encode([]byte(metrixTxContractInfo.GasPrice))
+
+		return ethTx, nil
+	}
+
+	if metrixTx.Generated {
+		ethTx.From = utils.AddHexPrefix(metrix.ZeroAddress)
+	} else {
+		ethTx.From, err = getNonContractTxSenderAddress(p, metrixDecodedRawTx.Vins)
+		if err != nil {
+			return nil, errors.WithMessage(err, "couldn't get non contract transaction sender address")
+		}
+		// TODO: discuss
+		// ? Does func above return incorrect address for graph-node (len is < 40)
+		// ! Temporary solution
+		ethTx.From = utils.AddHexPrefix(metrix.ZeroAddress)
+	}
+	ethTx.To, err = findNonContractTxReceiverAddress(metrixDecodedRawTx.Vouts)
+	if err != nil {
+		// TODO: discuss, research
+		// ? Some vouts doesn't have `receive` category at all
+		ethTx.To = utils.AddHexPrefix(metrix.ZeroAddress)
+
+		// TODO: uncomment, after todo above will be resolved
+		// return nil, errors.WithMessage(err, "couldn't get non contract transaction receiver address")
+	}
+	// TODO: discuss
+	// ? Does func above return incorrect address for graph-node (len is < 40)
+	// ! Temporary solution
+	ethTx.To = utils.AddHexPrefix(metrix.ZeroAddress)
+
+	// TODO: researching
+	// ! Temporary solution
+	//	if len(metrixTx.Hex) == 0 {
+	//		ethTx.Input = "0x0"
+	//	} else {
+	//		ethTx.Input = utils.AddHexPrefix(metrixTx.Hex)
+	//	}
+	ethTx.Input = utils.AddHexPrefix(metrixTx.Hex)
+
+	// TODO: researching
+	// ? Is it correct for non contract transaction
+	ethTx.Gas = "0x0"
+	ethTx.GasPrice = "0x0"
+
+	return ethTx, nil
+}
+
+// TODO: discuss
+// ? There are `witness` transactions, that is not acquireable nither via `gettransaction`, nor `getrawtransaction`
+func getRewardTransactionByHash(p *metrix.Metrix, hash string) (*eth.GetTransactionByHashResponse, error) {
+	rawMetrixTx, err := p.GetRawTransaction(hash, false)
+	if err != nil {
+		return nil, errors.WithMessage(err, "couldn't get raw reward transaction")
+	}
+
+	ethTx := &eth.GetTransactionByHashResponse{
+		Hash:  utils.AddHexPrefix(hash),
+		Nonce: "0x0",
+
+		// TODO: discuss
+		// ? Expect this value to be always zero
+		// Geth returns 0x if there is no input data for a transaction
+		Input: "0x",
+
+		// TODO: discuss
+		// ? Are zero values applicable
+		Gas:      "0x0",
+		GasPrice: "0x0",
+
+		// TODO: researching
+		// ? Do we need those values
+		V: "",
+		R: "",
+		S: "",
+	}
+
+	if !rawMetrixTx.IsPending() {
+		blockIndex, err := getTransactionIndexInBlock(p, hash, rawMetrixTx.BlockHash)
+		if err != nil {
+			return nil, errors.WithMessage(err, "couldn't get transaction index in block")
+		}
+		ethTx.TransactionIndex = hexutil.EncodeUint64(uint64(blockIndex))
+
+		blockNumber, err := getBlockNumberByHash(p, rawMetrixTx.BlockHash)
+		if err != nil {
+			return nil, errors.WithMessage(err, "couldn't get block number by hash")
+		}
+		ethTx.BlockNumber = hexutil.EncodeUint64(blockNumber)
+
+		ethTx.BlockHash = utils.AddHexPrefix(rawMetrixTx.BlockHash)
+	}
+
+	for i := range rawMetrixTx.Vouts {
+		// TODO: discuss
+		// ! The response may be null, even if txout is presented
+		_, err := p.GetTransactionOut(hash, i, rawMetrixTx.IsPending())
+		if err != nil {
+			return nil, errors.WithMessage(err, "couldn't get transaction out")
+		}
+		// TODO: discuss, researching
+		// ? Where is a reward amount
+		ethTx.Value = "0x0"
+	}
+
+	// TODO: discuss
+	// ? Do we have to set `from` == `0x00..00`
+	ethTx.From = utils.AddHexPrefix(metrix.ZeroAddress)
+	// TODO: discuss
+	// ? Where is a `to`
+	ethTx.To = utils.AddHexPrefix(metrix.ZeroAddress)
+
+	return ethTx, nil
+}

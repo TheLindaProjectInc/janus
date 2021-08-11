@@ -1,0 +1,42 @@
+version: "3.3"
+services:
+  janus:
+    image: metrixcoin/janus:dev
+    build:
+      context: ../../
+      dockerfile: ./Dockerfile
+      cache_from:
+        - golang:1.14-alpine
+        - metrixcoin/janus:dev
+    ports:
+      - "23889:23889"
+    environment:
+      - METRIX_RPC=http://metrix:testpasswd@metrix:33831
+    volumes:
+      - ../standalone/myaccounts.txt:$GOPATH/github.com/TheLindaProjectInc/janus/myaccounts.txt
+    depends_on:
+      - metrix
+    command: --bind 0.0.0.0 --accounts /go/src/github.com/TheLindaProjectInc/janus/myaccounts.txt --dev
+  metrix:
+    ports:
+      - "33831:33831"
+    image: metrixcoin/metrix-seeded
+    build:
+      context: ../../docker
+      dockerfile: ./metrix-seeded.Dockerfile
+      cache_from:
+        - metrixcoin/metrix-seeded
+    container_name: metrix_seeded_testchain
+    command: metrixd -regtest -addrindex -txindex -rpcbind=0.0.0.0:33831 -rpcallowip=0.0.0.0/0 -logevents -rpcuser=metrix -rpcpassword=testpasswd -deprecatedrpc=accounts -printtoconsole
+  openzeppelin:
+    image: metrixcoin/janus-openzeppelin
+    build:
+      context: .
+      dockerfile: ./openzeppelin.Dockerfile
+      cache_from:
+        - metrixcoin/janus-openzeppelin
+    environment:
+      - GENERATE_TO_ADDRESS=qW28njWueNpBXYWj2KDmtFG2gbLeALeHfV
+    depends_on:
+      - janus
+    command: truffle test --network docker

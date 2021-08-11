@@ -1,0 +1,4 @@
+/janus-linux-amd64
+/.metrix
+/supervisord.*
+/env.list

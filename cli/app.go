@@ -1,0 +1,149 @@
+package cli
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/btcsuite/btcutil"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
+	"github.com/pkg/errors"
+	"github.com/TheLindaProjectInc/janus/pkg/notifier"
+	"github.com/TheLindaProjectInc/janus/pkg/metrix"
+	"github.com/TheLindaProjectInc/janus/pkg/server"
+	"github.com/TheLindaProjectInc/janus/pkg/transformer"
+	"gopkg.in/alecthomas/kingpin.v2"
+)
+
+var (
+	app = kingpin.New("janus", "Metrix adapter to Ethereum JSON RPC")
+
+	accountsFile = app.Flag("accounts", "account private keys (in WIF) returned by eth_accounts").Envar("ACCOUNTS").File()
+
+	metrixRPC     = app.Flag("metrix-rpc", "URL of metrix RPC service").Envar("METRIX_RPC").Default("").String()
+	metrixNetwork = app.Flag("metrix-network", "").Envar("METRIX_NETWORK").Default("regtest").String()
+	bind        = app.Flag("bind", "network interface to bind to (e.g. 0.0.0.0) ").Default("localhost").String()
+	port        = app.Flag("port", "port to serve proxy").Default("23889").Int()
+	httpsKey    = app.Flag("https-key", "https keyfile").Default("").String()
+	httpsCert   = app.Flag("https-cert", "https certificate").Default("").String()
+
+	devMode        = app.Flag("dev", "[Insecure] Developer mode").Envar("DEV").Default("false").Bool()
+	singleThreaded = app.Flag("singleThreaded", "[Non-production] Process RPC requests in a single thread").Envar("SINGLE_THREADED").Default("false").Bool()
+
+	ignoreUnknownTransactions = app.Flag("ignoreTransactions", "[Development] Ignore transactions inside blocks we can't fetch and return responses instead of failing").Default("false").Bool()
+
+	generateToAddressTo = app.Flag("generateToAddressTo", "[regtest only] configure address to mine blocks to when mining new transactions in blocks").Envar("GENERATE_TO_ADDRESS").Default("").String()
+)
+
+func loadAccounts(r io.Reader, l log.Logger) metrix.Accounts {
+	var accounts metrix.Accounts
+
+	if accountsFile != nil {
+		s := bufio.NewScanner(*accountsFile)
+		for s.Scan() {
+			line := s.Text()
+
+			wif, err := btcutil.DecodeWIF(line)
+			if err != nil {
+				level.Error(l).Log("msg", "Failed to parse account", "err", err.Error())
+				continue
+			}
+
+			accounts = append(accounts, wif)
+		}
+	}
+
+	if len(accounts) > 0 {
+		level.Info(l).Log("msg", fmt.Sprintf("Loaded %d accounts", len(accounts)))
+	} else {
+		level.Warn(l).Log("msg", "No accounts loaded from account file")
+	}
+
+	return accounts
+}
+
+func action(pc *kingpin.ParseContext) error {
+	addr := fmt.Sprintf("%s:%d", *bind, *port)
+	logger := log.NewLogfmtLogger(os.Stdout)
+
+	if !*devMode {
+		logger = level.NewFilter(logger, level.AllowWarn())
+	}
+
+	var accounts metrix.Accounts
+	if *accountsFile != nil {
+		accounts = loadAccounts(*accountsFile, logger)
+		(*accountsFile).Close()
+	}
+
+	isMain := *metrixNetwork == metrix.ChainMain
+
+	metrixJSONRPC, err := metrix.NewClient(
+		isMain,
+		*metrixRPC,
+		metrix.SetDebug(*devMode),
+		metrix.SetLogger(logger),
+		metrix.SetAccounts(accounts),
+		metrix.SetGenerateToAddress(*generateToAddressTo),
+		metrix.SetIgnoreUnknownTransactions(*ignoreUnknownTransactions),
+	)
+	if err != nil {
+		return errors.Wrap(err, "jsonrpc#New")
+	}
+
+	metrixClient, err := metrix.New(metrixJSONRPC, *metrixNetwork)
+	if err != nil {
+		return errors.Wrap(err, "metrix#New")
+	}
+
+	agent := notifier.NewAgent(context.Background(), metrixClient, nil)
+	proxies := transformer.DefaultProxies(metrixClient, agent)
+	t, err := transformer.New(
+		metrixClient,
+		proxies,
+		transformer.SetDebug(*devMode),
+		transformer.SetLogger(logger),
+	)
+	if err != nil {
+		return errors.Wrap(err, "transformer#New")
+	}
+	agent.SetTransformer(t)
+
+	httpsKeyFile := getEmptyStringIfFileDoesntExist(*httpsKey, logger)
+	httpsCertFile := getEmptyStringIfFileDoesntExist(*httpsCert, logger)
+
+	s, err := server.New(
+		metrixClient,
+		t,
+		addr,
+		server.SetLogger(logger),
+		server.SetDebug(*devMode),
+		server.SetSingleThreaded(*singleThreaded),
+		server.SetHttps(httpsKeyFile, httpsCertFile),
+	)
+	if err != nil {
+		return errors.Wrap(err, "server#New")
+	}
+
+	return s.Start()
+}
+
+func getEmptyStringIfFileDoesntExist(file string, l log.Logger) string {
+	_, err := os.Stat(file)
+	if os.IsNotExist(err) {
+		l.Log("file does not exist", file)
+		return ""
+	}
+	return file
+}
+
+func Run() {
+	kingpin.MustParse(app.Parse(os.Args[1:]))
+}
+
+func init() {
+	app.Action(action)
+}
