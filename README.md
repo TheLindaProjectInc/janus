@@ -1,6 +1,8 @@
 # Metrix adapter to Ethereum JSON RPC
 Janus is a web3 proxy adapter that can be used as a web3 provider to interact with Metrix. It supports HTTP(s) and websockets and the current version enables self hosting of keys.
 
+All credit for development goes to [Qtum](https://github.com/qtumproject/janus)
+
 # Table of Contents
 
 - [Requirements](#requirements)
