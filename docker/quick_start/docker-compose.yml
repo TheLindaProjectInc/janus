@@ -26,6 +26,6 @@ services:
       - "33841:33841"
     image: metrixcoin/metrix
     container_name: metrix_testchain
-    command: metrixd -testnet -txindex -addrindex=1 -rpcbind=0.0.0.0:33841 -rpcallowip=0.0.0.0/0 -logevents -rpcuser=metrix -rpcpassword=testpasswd -deprecatedrpc=accounts -printtoconsole
+    command: metrixd -testnet -datadir=/metrixd-volume -txindex -rpcbind=0.0.0.0:33841 -rpcallowip=0.0.0.0/0 -logevents -rpcuser=metrix -rpcpassword=testpasswd -deprecatedrpc=accounts -printtoconsole
     volumes:
       - metrixd-volume

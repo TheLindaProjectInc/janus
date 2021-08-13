@@ -4,7 +4,7 @@ version: "3.3"
 networks:
   metrix-mainnet-network:
 volumes:
-  metrixd-mainnet-volume:
+  metrixd-volume-mainnet:
 
 services:
   janus_mainnet:
@@ -35,7 +35,7 @@ services:
     container_name: metrix_mainnet
     environment: 
         - COMPOSE_PROJECT_NAME=mainnet
-    command: metrixd  -txindex -addrindex=1 -rpcbind=0.0.0.0:33831 -rpcallowip=0.0.0.0/0 -rpcuser=metrix -rpcpassword=testpasswd -deprecatedrpc=accounts 
+    command: metrixd  -txindex -datadir=/metrixd-volume-mainnet -rpcbind=0.0.0.0:33831 -rpcallowip=0.0.0.0/0 -rpcuser=metrix -rpcpassword=testpasswd -deprecatedrpc=accounts 
     volumes:
       - metrixd-volume-mainnet
     networks:
